@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
-import { ensureTablesExist } from "@/lib/init-db";
+import { getDisplayedOverallStatus, LATEST_SNAPSHOT_ORDER } from "@/lib/status-truth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,12 +17,10 @@ export async function GET() {
   const timestamp = new Date().toISOString();
 
   try {
-    await ensureTablesExist();
-
     const snapshots = await queryNeon<Record<string, any>>(
       `SELECT raw_payload, backend_status, database_status, latency_ms, COALESCE(created_at, timestamp) AS snapshot_time 
        FROM status_snapshots 
-       ORDER BY id DESC 
+       ORDER BY ${LATEST_SNAPSHOT_ORDER}
        LIMIT 1`
     );
 
@@ -39,13 +37,10 @@ export async function GET() {
             : latest.raw_payload;
       }
 
-      let overallStatus =
-        payload?.overallStatus || latest.backend_status || "unknown";
-
-      // If snapshot is older than 5 minutes (300,000 ms), telemetry is stale
-      if (snapshotAgeMs > 300000 && overallStatus === "operational") {
-        overallStatus = "stale";
-      }
+      const overallStatus = getDisplayedOverallStatus(
+        payload?.overallStatus || latest.backend_status,
+        snapshotAgeMs
+      );
 
       return NextResponse.json({
         ...payload,
@@ -70,7 +65,7 @@ export async function GET() {
         overallStatus: "unknown",
         timestamp,
         source: "neon_db_error",
-        error: dbErr?.message || "Database connection error",
+        error: "Status data is temporarily unavailable.",
         services: {},
       },
       { status: 500 }

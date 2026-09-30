@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
-import { ensureTablesExist } from "@/lib/init-db";
+import {
+  getRequestClientKey,
+  parseIncidentPayload,
+  PayloadValidationError,
+  verifyRequiredSecret,
+  writeRateLimiter,
+} from "@/lib/api-security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 export async function GET() {
-  await ensureTablesExist();
-
   // Read active incidents & recent updates from Neon PostgreSQL
   try {
     const incidents = await queryNeon(`
@@ -37,19 +41,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const rateLimit = writeRateLimiter.check(`incident:${getRequestClientKey(request)}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
+  }
+  if (!verifyRequiredSecret(process.env.STATUS_ADMIN_KEY, request.headers.get("authorization"))) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
-    // Open internal endpoint for internal team usage (no auth required)
-    const body = await request.json();
-    const { title, status, impact, summary, message } = body;
-
-    if (!title || !status) {
-      return NextResponse.json(
-        { error: "title and status are required" },
-        { status: 400 }
-      );
-    }
-
-    await ensureTablesExist();
+    const { title, status, impact, summary, message } = parseIncidentPayload(await request.json());
 
     // Insert incident into Neon PostgreSQL
     const inserted = await queryNeon(
@@ -70,7 +71,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, incident }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message }, { status: 500 });
+  } catch (err) {
+    if (err instanceof PayloadValidationError || err instanceof SyntaxError) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Invalid request body." }, { status: 400 });
+    }
+    console.error("[Incidents API] Failed to create incident:", err);
+    return NextResponse.json({ error: "Unable to create the incident." }, { status: 500 });
   }
 }

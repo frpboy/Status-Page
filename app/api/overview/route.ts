@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
-import { ensureTablesExist } from "@/lib/init-db";
+import { getDisplayedOverallStatus, LATEST_SNAPSHOT_ORDER } from "@/lib/status-truth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,14 +9,12 @@ export async function GET() {
   const timestamp = new Date().toISOString();
 
   try {
-    await ensureTablesExist();
-
     const [snapshots, historyRows, incidentsRows, slaRows, maintRows, alertRows] =
       await Promise.all([
         queryNeon<Record<string, any>>(
           `SELECT raw_payload, backend_status, database_status, latency_ms, COALESCE(created_at, timestamp) AS snapshot_time 
            FROM status_snapshots 
-           ORDER BY id DESC 
+           ORDER BY ${LATEST_SNAPSHOT_ORDER}
            LIMIT 1`
         ),
         queryNeon<Record<string, any>>(
@@ -70,19 +68,8 @@ export async function GET() {
       overallStatus =
         latestStatusPayload?.overallStatus || latest.backend_status || "unknown";
 
-      if (snapshotAgeMs > 300000 && overallStatus === "operational") {
-        overallStatus = "stale";
-      }
+      overallStatus = getDisplayedOverallStatus(overallStatus, snapshotAgeMs);
     }
-
-    const defaultSla = [
-      { service_name: "AWS ECS Backend Container Service", sla_percentage: "99.98", month_year: "2026-09" },
-      { service_name: "AWS RDS PostgreSQL Database Instance", sla_percentage: "100.00", month_year: "2026-09" },
-      { service_name: "AWS EC2 Bastion SSM DB Tunnel", sla_percentage: "99.95", month_year: "2026-09" },
-      { service_name: "AWS Cognito Identity Provider", sla_percentage: "100.00", month_year: "2026-09" },
-      { service_name: "Neon Serverless PostgreSQL DB", sla_percentage: "100.00", month_year: "2026-09" },
-      { service_name: "AWS CloudFront Edge CDN", sla_percentage: "99.99", month_year: "2026-09" },
-    ];
 
     return NextResponse.json({
       status: {
@@ -93,7 +80,7 @@ export async function GET() {
       },
       history: historyRows || [],
       incidents: incidentsRows || [],
-      sla: slaRows && slaRows.length > 0 ? slaRows : defaultSla,
+      sla: slaRows || [],
       maintenances: maintRows || [],
       alerts: alertRows || [],
       timestamp,
@@ -106,7 +93,7 @@ export async function GET() {
           overallStatus: "unknown",
           timestamp,
           source: "error_fallback",
-          error: err?.message || "Database connection error",
+          error: "Status data is temporarily unavailable.",
         },
         history: [],
         incidents: [],

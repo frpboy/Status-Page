@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
-import { ensureTablesExist } from "@/lib/init-db";
+import { getRequestClientKey, verifyRequiredSecret, writeRateLimiter } from "@/lib/api-security";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const rateLimit = writeRateLimiter.check(`cron:${getRequestClientKey(request)}`);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
+  }
+  if (!verifyRequiredSecret(process.env.CRON_SECRET, request.headers.get("authorization"))) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const backendUrl =
     process.env.NEXT_PUBLIC_API_URL || "https://erp.zerpai.com/api/v1";
   const publicEdgeUrl = "https://erp.zerpai.com";
@@ -75,8 +83,6 @@ export async function GET() {
   let dbErrorMsg: string | null = null;
 
   try {
-    await ensureTablesExist();
-
     await queryNeon(
       `INSERT INTO status_snapshots (backend_status, database_status, latency_ms, raw_payload)
        VALUES ($1, $2, $3, $4)`,

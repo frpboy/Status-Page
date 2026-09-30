@@ -115,11 +115,6 @@ export default function StatusPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-  const [mounted, setMounted] = useState<boolean>(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const fetchOverview = useCallback(async () => {
     setLoading(true);
@@ -157,10 +152,13 @@ export default function StatusPage() {
   }, []);
 
   useEffect(() => {
-    fetchOverview();
-    if (!autoRefresh) return;
+    const initialFetch = setTimeout(fetchOverview, 0);
+    if (!autoRefresh) return () => clearTimeout(initialFetch);
     const interval = setInterval(fetchLiveStatusOnly, 5000); // 5s polling interval
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialFetch);
+      clearInterval(interval);
+    };
   }, [fetchOverview, fetchLiveStatusOnly, autoRefresh]);
 
   const getStatusBadge = (status?: string) => {
@@ -302,7 +300,7 @@ export default function StatusPage() {
 
         {/* Overall Status Banner */}
         <div className="mt-6">
-          {(overallStatus === "operational" || overallStatus === "stale") && (
+          {overallStatus === "operational" && (
             <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between shadow-xl">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
@@ -319,7 +317,21 @@ export default function StatusPage() {
               </div>
               <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                <span suppressHydrationWarning>Checked {mounted ? lastRefreshed.toLocaleTimeString() : "--:--:--"}</span>
+                <span suppressHydrationWarning>Checked {lastRefreshed.toLocaleTimeString()}</span>
+              </div>
+            </div>
+          )}
+
+          {overallStatus === "stale" && (
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 flex items-center justify-between shadow-xl">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-amber-400">Telemetry Is Stale</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">No current authoritative observation is available. Service health is unverified.</p>
+                </div>
               </div>
             </div>
           )}
@@ -520,7 +532,7 @@ export default function StatusPage() {
                   </p>
                 </div>
               </div>
-              <div>{getStatusBadge((data?.services as any)?.neon_db?.status || "operational")}</div>
+              <div>{getStatusBadge((data?.services as any)?.neon_db?.status || "unknown")}</div>
             </div>
           </div>
         </div>
@@ -552,6 +564,9 @@ export default function StatusPage() {
               </div>
             ))}
           </div>
+          {slaList.length === 0 && (
+            <p className="text-xs text-slate-400">No verified monthly SLA observations are available yet.</p>
+          )}
         </div>
 
         {/* 90-Day Historical Uptime Calendar Section */}

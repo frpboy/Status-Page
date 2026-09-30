@@ -194,7 +194,7 @@ async function executeTieredProbe() {
   };
 }
 
-export default {
+const probeWorker = {
   async fetch(request: Request) {
     try {
       const result = await executeTieredProbe();
@@ -210,3 +210,5 @@ export default {
     }
   },
 };
+
+export default probeWorker;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
-import { ensureTablesExist } from "@/lib/init-db";
+import { getDisplayedOverallStatus, LATEST_SNAPSHOT_ORDER } from "@/lib/status-truth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,12 +12,10 @@ export async function GET(request: Request) {
   let badgeColor = "#64748b"; // Slate Gray for unknown
 
   try {
-    await ensureTablesExist();
-
     const snapshots = await queryNeon<Record<string, any>>(
       `SELECT backend_status, database_status, raw_payload, COALESCE(created_at, timestamp) AS snapshot_time
        FROM status_snapshots
-       ORDER BY id DESC
+       ORDER BY ${LATEST_SNAPSHOT_ORDER}
        LIMIT 1`
     );
 
@@ -33,11 +31,7 @@ export async function GET(request: Request) {
             ? JSON.parse(latest.raw_payload)
             : latest.raw_payload;
       }
-      status = raw.overallStatus || latest.backend_status || "unknown";
-
-      if (snapshotAgeMs > 300000 && status === "operational") {
-        status = "stale";
-      }
+      status = getDisplayedOverallStatus(raw.overallStatus || latest.backend_status, snapshotAgeMs);
     }
   } catch (err) {
     status = "unknown";

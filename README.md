@@ -12,17 +12,18 @@ Comprehensive project documentation is available under `docs/`:
 | [TRD.md](file:///E:/zerpai-new/status-page/docs/TRD.md) | **Technical Requirements Document**: System interactions, API contracts, sequence flows, and fallback logic. |
 | [ERD.md](file:///E:/zerpai-new/status-page/docs/ERD.md) | **Entity Relationship Diagram & Schema**: 8 Neon PostgreSQL table definitions, columns, and constraints. |
 | [FRD.md](file:///E:/zerpai-new/status-page/docs/FRD.md) | **Functional Requirements Document**: Functional requirements matrix (FR-01 to FR-10) and evaluation logic. |
-| [TECH_STACK.md](file:///E:/zerpai-new/status-page/docs/TECH_STACK.md) | **Technology Stack**: Next.js 14 App Router, Vercel Edge Network, Neon Serverless, and AWS integrations. |
+| [TECH_STACK.md](file:///E:/zerpai-new/status-page/docs/TECH_STACK.md) | **Technology Stack**: Next.js 16 App Router, Vercel Edge Network, Neon Serverless, and AWS integrations. |
 | [UI_UX_SPECIFICATION.md](file:///E:/zerpai-new/status-page/docs/UI_UX_SPECIFICATION.md) | **UI/UX Design System**: Color tokens, typography, glassmorphism, micro-animations, and layout grid. |
 | [OPERATIONAL_PLAYBOOK.md](file:///E:/zerpai-new/status-page/docs/OPERATIONAL_PLAYBOOK.md) | **Operational Runbook**: Telemetry worker payload protocol, incident management SQL, and maintenance runbook. |
 
 ---
 
-## 2. Open Public Internal Access Policy
+## 2. Access Policy
 
-All status dashboard pages, APIs, and management endpoints are **100% public and unauthenticated**:
-- **Zero Authentication Required**: Designed for direct, frictionless internal team access without login prompts, JWT bearer tokens, or admin keys.
-- **Frictionless Incident Posting**: Internal engineers and operators can trigger incidents, post investigation updates, or schedule maintenance announcements directly via `POST /api/incidents`.
+Dashboard read endpoints are public. Every endpoint that changes telemetry or publishes operational communications is fail-closed:
+- `POST /api/incidents` and `POST /api/maintenances` require `Authorization: Bearer <STATUS_ADMIN_KEY>`.
+- `GET /api/cron/probe` requires `Authorization: Bearer <CRON_SECRET>`.
+- Missing server-side secrets, invalid credentials, malformed payloads, and rate-limit breaches never reach the database.
 
 ---
 
@@ -74,6 +75,8 @@ AWS_ECS_SERVICE=zerpai-backend-service
 AWS_RDS_INSTANCE_ID=zerpai-db
 AWS_COGNITO_USER_POOL_ID=ap-south-2_h1Yyx4i4b
 AWS_EC2_BASTION_INSTANCE_ID=i-0e8150bdfa767cdb6
+STATUS_ADMIN_KEY=generate-a-distinct-high-entropy-secret
+CRON_SECRET=generate-a-distinct-high-entropy-secret
 ```
 
 ---
@@ -129,6 +132,10 @@ AWS_EC2_BASTION_INSTANCE_ID=i-0e8150bdfa767cdb6
 - **Connection String Sanitization**: Strip `channel_binding` flags (`&channel_binding=require`) from connection strings to prevent parameter parsing errors in serverless drivers.
 - **Single-Statement DDL Execution**: Multi-statement DDL scripts (`CREATE TABLE...; CREATE TABLE...;`) MUST NOT be executed in a single `queryNeon` call; execute each DDL statement as an isolated query.
 
+### Database Migration Policy
+
+Schema changes are reviewed SQL artifacts under `migrations/`. Application request handlers never create, alter, or initialize tables. Apply `migrations/0001_status_page_schema.sql` manually through the Neon change-management process before deploying the application.
+
 ---
 
 ## 9. Non-False-Green Status Taxonomy Invariants
@@ -164,5 +171,3 @@ Embed a live operational status badge directly into your GitHub `README.md` or i
 
 - **Endpoints**: `GET /api/badge` or `GET /api/badge.svg`
 - **Behavior**: Returns a dynamic, no-cache SVG badge (`image/svg+xml`) that reflects live system status (`operational` in green, `degraded` in yellow, `outage` in red, `unverified` in slate gray).
-
-
