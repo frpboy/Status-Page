@@ -17,3 +17,13 @@ Files modified: `app/api/cron/probe/route.ts`, `lib/sla-aggregation.ts`, `tests/
 Verification: SLA behavior was developed test-first: the new tests failed before the aggregation helper existed and pass after implementation. The destructive retention SQL was generated for manual database-owner review only and was not executed.
 
 Timestamp of Log Update: 30 September 2026 at 11:46 AM (IST)
+
+## 3) [2026-09-30 11:51:13 +05:30] Correct Quality Secret-Scan Event Range
+
+Scope & Implementation: Removed explicit `base` and `head` inputs from the pinned TruffleHog action after GitHub Actions evidence showed that both resolved to the same checkout on push events. The action now derives the correct event commit range itself.
+
+Files modified: `.github/workflows/quality.yml` and this log.
+
+Verification: GitHub Actions run `36677620580` established the root cause: TruffleHog rejected the equal base/head commits before scanning. The corrected workflow will be verified by the pull-request Quality run.
+
+Timestamp of Log Update: 30 September 2026 at 11:51 AM (IST)
