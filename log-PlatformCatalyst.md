@@ -7,3 +7,13 @@ Files modified: `.env.example`, `README.md`, `app/api/*`, `app/page.tsx`, `funct
 Verification: Isolated clean-lockfile verification completed TypeScript checking, ESLint, 10 unit tests, Next.js 16.3.7 production build, and production dependency audit with zero vulnerabilities. The active local `node_modules` remains unavailable for direct verification because a pre-existing Next development process holds its native binary lock.
 
 Timestamp of Log Update: 30 September 2026 at 11:32 AM (IST)
+
+## 2) [2026-09-30 11:46:55 +05:30] Telemetry Retention Policy and Authoritative SLA Rollup
+
+Scope & Implementation: Added a 90-day raw telemetry retention policy with indefinite compact daily/monthly summary retention and a human-only bounded purge procedure. Added the scheduled current-month SLA rollup, which uses only authoritative service observations and excludes unknown/stale evidence. Pinned all CI actions to verified commit SHAs.
+
+Files modified: `app/api/cron/probe/route.ts`, `lib/sla-aggregation.ts`, `tests/status-truth.test.ts`, `docs/RETENTION_POLICY.md`, `supabase/sql/manual_destructive/20260930_1146_status_snapshot_retention_MANUAL_DESTRUCTIVE.sql`, `.github/workflows/quality.yml`, and this log.
+
+Verification: SLA behavior was developed test-first: the new tests failed before the aggregation helper existed and pass after implementation. The destructive retention SQL was generated for manual database-owner review only and was not executed.
+
+Timestamp of Log Update: 30 September 2026 at 11:46 AM (IST)

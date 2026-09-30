@@ -6,6 +6,7 @@ import {
   getDisplayedOverallStatus,
   getServiceStatus,
 } from "@/lib/status-truth";
+import { calculateMonthlySla } from "@/lib/sla-aggregation";
 
 test("latest snapshots are ordered by observation timestamp, never random UUID", () => {
   assert.equal(LATEST_SNAPSHOT_ORDER, "created_at DESC, id DESC");
@@ -21,4 +22,15 @@ test("missing service evidence remains unknown", () => {
 
 test("unknown is preserved rather than promoted to operational", () => {
   assert.equal(getDisplayedOverallStatus("unknown", 0), "unknown");
+});
+
+test("monthly SLA counts only authoritative checks and never treats unknown as healthy", () => {
+  assert.deepEqual(
+    calculateMonthlySla(["operational", "degraded", "unknown", "outage"]),
+    { totalChecks: 3, successfulChecks: 1, percentage: "33.33" }
+  );
+});
+
+test("monthly SLA remains absent when there is no authoritative evidence", () => {
+  assert.equal(calculateMonthlySla(["unknown", "stale"]), null);
 });

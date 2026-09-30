@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
 import { getRequestClientKey, verifyRequiredSecret, writeRateLimiter } from "@/lib/api-security";
+import { refreshCurrentMonthSla } from "@/lib/sla-aggregation";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,9 @@ export async function GET(request: Request) {
          updated_at = NOW()`,
       [todayStr, isOperational ? 1 : 0, latencyMs]
     );
+
+    // Rebuild the current month's SLA only from authoritative service observations.
+    await refreshCurrentMonthSla();
 
     neonLogged = true;
   } catch (dbErr: any) {
