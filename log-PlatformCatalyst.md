@@ -17,3 +17,27 @@ Files modified: `app/api/cron/probe/route.ts`, `lib/sla-aggregation.ts`, `tests/
 Verification: SLA behavior was developed test-first: the new tests failed before the aggregation helper existed and pass after implementation. The destructive retention SQL was generated for manual database-owner review only and was not executed.
 
 Timestamp of Log Update: 30 September 2026 at 11:46 AM (IST)
+
+
+## 3) [5 October 2026 at 5:23 pm IST] Restore continuous collection and truthful monitoring display
+
+Root cause: production/local cron secrets were absent, the Vercel fallback runs daily, and no continuous collector was running. Neon originally ended at October 5 12:53:04 PM IST with October 1-4 unobserved and no monthly summaries.
+
+Implementation: unified cron/daemon writer, atomic snapshot/daily persistence, committed Neon status, monthly rollup, bounded requests, health-aware check success, stale component badges, explicit UTC history dates and IST observation timestamps, summary refresh/error handling, real component values, coverage-aware reporting, CI scan correction and current operational documentation. Generated local ignored write secrets and started the 60-second collector under existing PM2.
+
+Files modified: .github/workflows/quality.yml, README.md, app/api/cron/probe/route.ts, app/api/history/route.ts, app/api/incidents/route.ts, app/api/overview/route.ts, app/api/status/route.ts, app/page.tsx, docs/TRD.md, functions/probe-worker.ts, lib/db.ts, lib/sla-aggregation.ts, lib/status-truth.ts, package.json, scripts/continuous-probe.js, tests/status-truth.test.ts, tests/probe.test.ts, docs/2026-10-05-RELIABILITY-AUDIT.md and this append-only log.
+
+Verification: 16 tests pass, lint/typecheck pass, production build passes, dependency audit has zero vulnerabilities; authenticated local cron returns 200 with snapshot and SLA persistence, unauthenticated cron returns 401, invalid incident input returns 400. Successive Neon records and local/production reads verify restored freshness; Chrome verifies corrected local display. No migrations, destructive SQL, historical backfill, commits, pushes, or production publication. Remaining host/publication/security boundaries are recorded in docs/2026-10-05-RELIABILITY-AUDIT.md.
+
+Timestamp of Log Update: 5 October 2026 at 5:23 pm (IST)
+
+
+## 4) [5 October 2026 at 5:29 pm IST] Remove unused manual publication and probe secret dependencies
+
+User explicitly requested removing STATUS_ADMIN_KEY and CRON_SECRET because this dashboard needs no manual alert publication. Removed secret checks from cron and worker, removed incident/maintenance POST handlers and their now-unused authorization/payload helpers, and retained read endpoints and probe rate limiting. Removed the two keys from .env.example and existing local environment files without exposing other values. Updated current README/TRD; prior audit entries remain historical.
+
+Files modified: .env.example, README.md, docs/TRD.md, app/api/cron/probe/route.ts, app/api/incidents/route.ts, app/api/maintenances/route.ts, functions/probe-worker.ts, lib/api-security.ts, tests/security.test.ts, tests/probe.test.ts, ignored local .env files, and this log.
+
+Verification: 11 applicable tests pass; ESLint and TypeScript pass; local cron accepts a request without authorization and commits real telemetry; manual POST routes return 405 while history GETs remain available. Production deployment is unchanged.
+
+Timestamp of Log Update: 5 October 2026 at 5:29 pm (IST)

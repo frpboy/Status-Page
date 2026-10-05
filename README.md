@@ -1,6 +1,6 @@
 # Zerpai Infrastructure System Status Page & Telemetry Engine
 
-A standalone, high-reliability **Next.js 14** system status dashboard and continuous telemetry engine deployed to **Vercel Edge Network** with **Neon Serverless PostgreSQL** analytics.
+A standalone, high-reliability **Next.js 16** system status dashboard and continuous telemetry engine deployed to **Vercel Edge Network** with **Neon Serverless PostgreSQL** analytics.
 
 ## 1. Architecture & Specification Documentation Index
 
@@ -20,10 +20,7 @@ Comprehensive project documentation is available under `docs/`:
 
 ## 2. Access Policy
 
-Dashboard read endpoints are public. Every endpoint that changes telemetry or publishes operational communications is fail-closed:
-- `POST /api/incidents` and `POST /api/maintenances` require `Authorization: Bearer <STATUS_ADMIN_KEY>`.
-- `GET /api/cron/probe` requires `Authorization: Bearer <CRON_SECRET>`.
-- Missing server-side secrets, invalid credentials, malformed payloads, and rate-limit breaches never reach the database.
+This deployment is used as an internal monitoring dashboard. Probes do not require authorization secrets. Incident and maintenance APIs are read-only; manual publication endpoints have been removed. Probe rate limiting remains enabled.
 
 ---
 
@@ -48,10 +45,19 @@ Dashboard read endpoints are public. Every endpoint that changes telemetry or pu
 
 ## 3. Dedicated Sub-Minute Probing & Vercel Cron Quota Architecture
 
-### Why Neon Serverless Functions are used instead of Vercel Crons:
-- **Vercel Cron Quota Restriction**: Vercel Hobby / Free plan **restricts Cron Jobs to a maximum of once per day (1 execution per 24 hours)**. Vercel rejects sub-minute or hourly crons on free deployments.
-- **Neon Serverless Edge Function (`statusprobe`)**: To achieve continuous **30-second availability probing** and **5-minute heavy CloudWatch telemetry collection**, we deploy a dedicated **Neon Serverless Function** (`statusprobe`) directly adjacent to the Neon PostgreSQL database in region `ap-southeast-1`.
-- **Read-Only Dashboard Cache Consumer**: The Next.js status page dashboard (`GET /api/status`) is strictly a read-only consumer of Neon DB snapshots. User page refreshes do **not** trigger backend monitoring or CloudWatch queries, preventing sampling bias and excessive AWS API overhead.
+### Continuous collection
+- `npm run probe:daemon` executes the shared probe writer every 60 seconds, with one request in flight, upstream timeouts, and atomic snapshot/daily-summary writes.
+- The writer refreshes monthly observed availability from real service observations. Unknown/stale states never count as healthy.
+- Run the collector on an always-on host with a supervisor. A function URL does not schedule itself. A Windows collector stops during sleep/shutdown.
+- The daily Vercel cron is a fallback only; redeploy the corrected application before relying on it.
+- Visitors are read-only consumers. Five-second browser refreshes do not collect new observations.
+- Daily buckets use UTC; observation timestamps display in IST. Missing intervals stay unverified.
+
+```powershell
+pm2 start scripts/continuous-probe.js --name zerpai-status-probe --node-args="--import tsx" --cwd E:\zerpai-new\status-page
+pm2 save
+```
+`pm2 save` saves the process list; it does not install Windows startup. Configure startup on the chosen host separately.
 
 ---
 
@@ -75,8 +81,6 @@ AWS_ECS_SERVICE=zerpai-backend-service
 AWS_RDS_INSTANCE_ID=zerpai-db
 AWS_COGNITO_USER_POOL_ID=ap-south-2_h1Yyx4i4b
 AWS_EC2_BASTION_INSTANCE_ID=i-0e8150bdfa767cdb6
-STATUS_ADMIN_KEY=generate-a-distinct-high-entropy-secret
-CRON_SECRET=generate-a-distinct-high-entropy-secret
 ```
 
 ---
@@ -90,7 +94,7 @@ CRON_SECRET=generate-a-distinct-high-entropy-secret
   ```
   Open [http://localhost:3002](http://localhost:3002) in your browser.
 
-- **Run 30-Second Continuous Probe Daemon**:
+- **Run 60-Second Continuous Probe Daemon**:
   ```bash
   cd status-page
   npm run probe:daemon
@@ -113,7 +117,6 @@ CRON_SECRET=generate-a-distinct-high-entropy-secret
 - `GET /api/status`: Reads latest telemetry snapshot from Neon DB (`source: "neon_db_snapshot"`).
 - `GET /api/history`: Returns 90-day daily availability history for uptime calendar visualization.
 - `GET /api/incidents`: Fetches active incidents & timeline updates from Neon DB.
-- `POST /api/incidents`: Public internal endpoint to post new incidents & maintenance announcements.
 - `GET /api/cron/probe`: Daily Vercel cron health probe fallback endpoint.
 
 ---

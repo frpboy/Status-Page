@@ -5,6 +5,7 @@ import {
   LATEST_SNAPSHOT_ORDER,
   getDisplayedOverallStatus,
   getServiceStatus,
+  getDisplayedServices,
 } from "@/lib/status-truth";
 import { calculateMonthlySla } from "@/lib/sla-aggregation";
 
@@ -33,4 +34,16 @@ test("monthly SLA counts only authoritative checks and never treats unknown as h
 
 test("monthly SLA remains absent when there is no authoritative evidence", () => {
   assert.equal(calculateMonthlySla(["unknown", "stale"]), null);
+});
+
+test("expired component evidence cannot retain green badges", () => {
+  const services = { ecs: { status: "operational", details: {} }, rds: { status: "unknown" } };
+  assert.equal(getDisplayedServices(services, 300_001).ecs.status, "stale");
+  assert.equal(getDisplayedServices(services, 300_001).rds.status, "unknown");
+  assert.equal(services.ecs.status, "operational");
+});
+
+test("invalid and future observation times cannot establish health", () => {
+  assert.equal(getDisplayedOverallStatus("operational", NaN), "unknown");
+  assert.equal(getDisplayedOverallStatus("operational", -60_000), "unknown");
 });

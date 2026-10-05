@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryNeon } from "@/lib/db";
-import { getDisplayedOverallStatus, LATEST_SNAPSHOT_ORDER } from "@/lib/status-truth";
+import { getDisplayedOverallStatus, getDisplayedServices, LATEST_SNAPSHOT_ORDER } from "@/lib/status-truth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,6 +44,7 @@ export async function GET() {
 
       return NextResponse.json({
         ...payload,
+        services: getDisplayedServices(payload.services, snapshotAgeMs),
         overallStatus,
         source: "neon_db_authoritative_snapshot",
         snapshotAgeMs,
