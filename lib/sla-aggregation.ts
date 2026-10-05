@@ -14,7 +14,7 @@ export function calculateMonthlySla(statuses: readonly string[]) {
   };
 }
 
-const monthlySlaRollupQuery = `
+export const monthlySlaRollupQuery = `
   WITH authoritative_service_checks AS (
     SELECT
       LEFT(COALESCE(NULLIF(service.value->>'name', ''), service.key), 100) AS service_name,
@@ -22,8 +22,8 @@ const monthlySlaRollupQuery = `
       CASE WHEN service.value->>'status' = 'operational' THEN 1 ELSE 0 END AS successful_check
     FROM status_snapshots AS snapshot
     CROSS JOIN LATERAL jsonb_each(COALESCE(snapshot.raw_payload->'services', '{}'::jsonb)) AS service(key, value)
-    WHERE snapshot.created_at >= DATE_TRUNC('month', NOW() AT TIME ZONE 'UTC')
-      AND snapshot.created_at < DATE_TRUNC('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
+    WHERE snapshot.created_at >= (DATE_TRUNC('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+      AND snapshot.created_at < ((DATE_TRUNC('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month') AT TIME ZONE 'UTC')
       AND service.value->>'status' IN ('operational', 'degraded', 'outage')
   )
   INSERT INTO subsystem_sla_monthly (

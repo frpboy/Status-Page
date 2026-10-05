@@ -2,12 +2,7 @@
   "version": 2,
   "framework": "nextjs",
   "regions": ["bom1"],
-  "crons": [
-    {
-      "path": "/api/cron/probe",
-      "schedule": "0 0 * * *"
-    }
-  ],
+  "crons": [],
   "headers": [
     {
       "source": "/api/(.*)",

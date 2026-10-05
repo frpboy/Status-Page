@@ -9,8 +9,9 @@ export async function GET() {
   try {
     // Query 90-day daily uptime history from Neon PostgreSQL
     const history = await queryNeon<Record<string, any>>(
-      `SELECT date, total_pings, successful_pings, uptime_percentage, avg_latency_ms, updated_at
+      `SELECT date::text AS date, total_pings, successful_pings, uptime_percentage, avg_latency_ms, updated_at
        FROM daily_uptime_snapshots
+       WHERE date >= CURRENT_DATE - 89
        ORDER BY date DESC
        LIMIT 90`
     );

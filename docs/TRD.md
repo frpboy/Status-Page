@@ -79,33 +79,18 @@ sequenceDiagram
 
 ---
 
-## 3. Database Initialization & Auto-Provisioning (`lib/init-db.ts`)
+## 3. Schema management
 
-Upon serverless cold start, `ensureTablesExist()` verifies the existence of all 8 core telemetry tables:
+Schema is provisioned through reviewed `migrations/0001_status_page_schema.sql`, never by request handlers. Existing tables must be present before deploying.
 
-```typescript
-export async function ensureTablesExist() {
-  if (isInitialized) return;
-  try {
-    await queryNeon(`CREATE TABLE IF NOT EXISTS status_snapshots (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS incidents (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS incident_updates (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS daily_uptime_snapshots (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS subsystem_latency_metrics (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS telemetry_threshold_alerts (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS scheduled_maintenances (...)`);
-    await queryNeon(`CREATE TABLE IF NOT EXISTS subsystem_sla_monthly (...)`);
-    isInitialized = true;
-  } catch (err) {
-    console.error("[Init DB] Failed to auto-provision Neon tables:", err);
-  }
-}
-```
+## 4. Freshness and reporting
 
----
+- Both status read routes mark component observations older than five minutes stale.
+- Unknown/stale evidence never produces a green status banner or synthetic SLA rows.
+- Monthly percentages count authoritative service observations, excluding unknown/stale states; they do not establish continuous contractual SLA coverage.
+- Daily history uses explicit UTC date strings. Zero percent remains zero; missing days stay unverified.
+- Overview refreshes every minute; the status snapshot refreshes every five seconds. Failed reads display an error and unverified badges.
 
-## 4. Stale Telemetry & Fallback Safeguards
+## 5. Collection
 
-1. **Snapshot Age Verification**: If `snapshotAgeMs > 300000` (5 minutes), the backend flags telemetry as `stale`.
-2. **UI Hero Banner Safeguard**: `page.tsx` renders the green `All Systems Operational` banner for both `operational` and `stale` states, preventing false UI blanking during temporary worker delays.
-3. **SLA Matrix Fallback**: If `subsystem_sla_monthly` table has no rows for the current month, `overview/route.ts` injects canonical target SLA metrics.
+The supervised daemon uses `executeTieredProbe` in `functions/probe-worker.ts` every 60 seconds. HTTP-triggered collection is disabled (410) and Vercel has no scheduled cron. Snapshot, daily and monthly summaries commit atomically. Independent scheduling requires an always-on host. A worker function URL alone is not a scheduler.

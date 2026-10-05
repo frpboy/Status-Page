@@ -79,6 +79,8 @@ interface IncidentRecord {
 }
 
 interface SlaItem {
+  total_checks: number;
+  successful_checks: number;
   service_name: string;
   sla_percentage: string | number;
   month_year: string;
@@ -114,12 +116,16 @@ export default function StatusPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/overview", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Status API returned ${res.status}`);
+      setFetchError(null);
+      setLastRefreshed(new Date());
       if (res.ok) {
         const payload = await res.json();
         if (payload.status) setData(payload.status);
@@ -131,23 +137,25 @@ export default function StatusPage() {
       }
     } catch (err) {
       console.error("Failed to fetch status overview:", err);
+      setFetchError("Unable to refresh monitoring data. Last observations are unverified.");
     } finally {
       setLoading(false);
-      setLastRefreshed(new Date());
     }
   }, []);
 
   const fetchLiveStatusOnly = useCallback(async () => {
     try {
       const res = await fetch("/api/status", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Status API returned ${res.status}`);
+      setFetchError(null);
+      setLastRefreshed(new Date());
       if (res.ok) {
         const statusPayload = await res.json();
         setData(statusPayload);
       }
     } catch (err) {
       console.error("Failed to fetch live status:", err);
-    } finally {
-      setLastRefreshed(new Date());
+      setFetchError("Unable to refresh monitoring data. Last observations are unverified.");
     }
   }, []);
 
@@ -155,9 +163,11 @@ export default function StatusPage() {
     const initialFetch = setTimeout(fetchOverview, 0);
     if (!autoRefresh) return () => clearTimeout(initialFetch);
     const interval = setInterval(fetchLiveStatusOnly, 5000); // 5s polling interval
+    const overviewInterval = setInterval(fetchOverview, 60_000);
     return () => {
       clearTimeout(initialFetch);
       clearInterval(interval);
+      clearInterval(overviewInterval);
     };
   }, [fetchOverview, fetchLiveStatusOnly, autoRefresh]);
 
@@ -170,7 +180,7 @@ export default function StatusPage() {
         </span>
       );
     }
-    const s = (status || "unknown").toLowerCase();
+    const s = fetchError ? "unknown" : (status || "unknown").toLowerCase();
     if (s === "operational" || s === "healthy" || s === "ok") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -211,16 +221,17 @@ export default function StatusPage() {
     );
   };
 
-  const overallStatus = data?.overallStatus || "unknown";
+  const overallStatus = fetchError ? "unknown" : data?.overallStatus || "unknown";
   const rdsDetails = data?.services?.rds?.details || {};
   const ecsDetails = data?.services?.ecs?.details || {};
   const cloudfrontDetails = data?.services?.cloudfront?.details || {};
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  const totalChecks = history.reduce((sum, day) => sum + day.total_pings, 0);
+  const successfulChecks = history.reduce((sum, day) => sum + day.successful_pings, 0);
+  const avgUptimePct = totalChecks > 0 ? (100 * successfulChecks / totalChecks).toFixed(2) : "—";
+  const formatIst = (value: string | Date) => new Date(value).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "medium" });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -238,7 +249,7 @@ export default function StatusPage() {
               <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                 Zerpai System Infrastructure Status
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  Live Telemetry
+                  {autoRefresh ? (overallStatus === "operational" ? "Current snapshot" : "Unverified telemetry") : "Refresh paused"}
                 </span>
               </h1>
               <p className="text-xs text-slate-400">AWS Infrastructure & API Performance Monitoring</p>
@@ -298,6 +309,11 @@ export default function StatusPage() {
           </div>
         )}
 
+        <div className="mt-4 text-xs text-slate-400" aria-live="polite">
+          Last observation: {data?.snapshotCreatedAt ? formatIst(data.snapshotCreatedAt) + " IST" : "No observation available"}
+          {fetchError && <p className="mt-1 text-amber-300" role="alert">{fetchError}</p>}
+        </div>
+
         {/* Overall Status Banner */}
         <div className="mt-6">
           {overallStatus === "operational" && (
@@ -311,13 +327,13 @@ export default function StatusPage() {
                     All Systems Operational
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Live telemetry verified via authoritative background worker snapshot at {data?.snapshotCreatedAt ? new Date(data.snapshotCreatedAt).toLocaleTimeString() : data?.timestamp ? new Date(data.timestamp).toLocaleTimeString() : "now"}.
+                    Live telemetry verified via authoritative background worker snapshot at {data?.snapshotCreatedAt ? formatIst(data.snapshotCreatedAt) + " IST" : data?.timestamp ? formatIst(data.timestamp) + " IST" : "now"}.
                   </p>
                 </div>
               </div>
               <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                <span suppressHydrationWarning>Checked {lastRefreshed.toLocaleTimeString()}</span>
+                <span suppressHydrationWarning>Page fetched {formatIst(lastRefreshed)} IST</span>
               </div>
             </div>
           )}
@@ -379,7 +395,7 @@ export default function StatusPage() {
             <div className="text-xl font-bold text-white">
               {rdsDetails.latencyMs !== undefined ? `${rdsDetails.latencyMs} ms` : "--"}
             </div>
-            <div className="text-[10px] text-slate-400 mt-1">Live query roundtrip</div>
+            <div className="text-[10px] text-slate-400 mt-1">Last observed query roundtrip</div>
           </div>
 
           <div className="p-4 rounded-xl glass-card border border-slate-800 bg-slate-900/60 backdrop-blur-md">
@@ -406,7 +422,7 @@ export default function StatusPage() {
             <div className="text-[10px] text-slate-400 mt-1">
               {rdsDetails.datapointTimestamp
                 ? `Datapoint @ ${new Date(rdsDetails.datapointTimestamp).toLocaleTimeString()}`
-                : `Swap: ${rdsDetails.swapUsageMB || "0.00 MB"}`}
+                : `Swap: ${rdsDetails.swapUsageMB || "Unverified"}`}
             </div>
           </div>
 
@@ -448,7 +464,7 @@ export default function StatusPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-white">AWS CloudFront CDN Edge Network</h3>
                   <p className="text-xs text-slate-400">
-                    ID: <code className="text-slate-300">ENDXK0TWGZT7G</code> &bull; Domain: <code className="text-slate-300">erp.zerpai.com</code> &bull; SSL/TLS: <code className="text-slate-300">Active</code>
+                    ID: <code className="text-slate-300">ENDXK0TWGZT7G</code> &bull; Domain: <code className="text-slate-300">erp.zerpai.com</code> &bull; HTTPS: <code className="text-slate-300">{cloudfrontDetails.httpStatus || cloudfrontDetails.statusCode || "Unverified"}</code>
                   </p>
                 </div>
               </div>
@@ -464,7 +480,7 @@ export default function StatusPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-white">AWS ECS Fargate Backend Container Service</h3>
                   <p className="text-xs text-slate-400">
-                    Cluster: <code className="text-slate-300">zerpai-cluster</code> &bull; Running Tasks: <code className="text-slate-300">{ecsDetails.runningTasks ?? "1"}/{ecsDetails.desiredTasks ?? "1"}</code>
+                    Cluster: <code className="text-slate-300">zerpai-cluster</code> &bull; Running Tasks: <code className="text-slate-300">{ecsDetails.runningTasks ?? "Unverified"}/{ecsDetails.desiredTasks ?? "Unverified"}</code>
                   </p>
                 </div>
               </div>
@@ -480,7 +496,7 @@ export default function StatusPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-white">AWS RDS PostgreSQL Database Instance</h3>
                   <p className="text-xs text-slate-400">
-                    Class: <code className="text-slate-300">{rdsDetails.class || "db.t4g.small"}</code> &bull; Storage: <code className="text-slate-300">{rdsDetails.allocatedStorageGB ? `${rdsDetails.allocatedStorageGB} GB` : "1199 MB"}</code> &bull; Conns: <code className="text-slate-300">{rdsDetails.connections ?? "18"}</code>
+                    Class: <code className="text-slate-300">{rdsDetails.class || "Unverified"}</code> &bull; Storage: <code className="text-slate-300">{rdsDetails.allocatedStorageGB ? `${rdsDetails.allocatedStorageGB} GB` : "Unverified"}</code> &bull; Conns: <code className="text-slate-300">{rdsDetails.totalConnections ?? rdsDetails.connections ?? "Unverified"}</code>
                   </p>
                 </div>
               </div>
@@ -496,7 +512,7 @@ export default function StatusPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-white">AWS EC2 Bastion SSM DB Tunnel</h3>
                   <p className="text-xs text-slate-400">
-                    ID: <code className="text-slate-300">i-0e8150bdfa767cdb6</code> &bull; State: <code className="text-slate-300">{bastionDetails.state || "running"}</code> &bull; Port: <code className="text-slate-300">5433</code>
+                    ID: <code className="text-slate-300">i-0e8150bdfa767cdb6</code> &bull; State: <code className="text-slate-300">{bastionDetails.instanceState || bastionDetails.state || "Unverified"}</code> &bull; Port: <code className="text-slate-300">5433</code>
                   </p>
                 </div>
               </div>
@@ -528,7 +544,7 @@ export default function StatusPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-white">Neon Serverless PostgreSQL DB</h3>
                   <p className="text-xs text-slate-400">
-                    Fail-Safe Telemetry Storage & Historical Uptime Aggregation &bull; Status: <code className="text-slate-300">Connected & Operational</code>
+                    Fail-Safe Telemetry Storage & Historical Uptime Aggregation &bull; Status: <code className="text-slate-300">{data?.services?.neon_db?.details?.note || "Connection unverified"}</code>
                   </p>
                 </div>
               </div>
@@ -543,7 +559,7 @@ export default function StatusPage() {
             <div className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-indigo-400" />
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                Subsystem Monthly Uptime SLA Breakdown
+                Subsystem Monthly Observed Availability
               </h2>
             </div>
             <span className="text-xs font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20">
@@ -556,16 +572,16 @@ export default function StatusPage() {
               <div key={idx} className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-white truncate max-w-[180px]">{item.service_name}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Period: {item.month_year}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Period: {item.month_year} · {item.successful_checks}/{item.total_checks} checks</p>
                 </div>
-                <span className="text-sm font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                <span className={`text-sm font-bold px-2 py-0.5 rounded border font-mono ${Number(item.sla_percentage) >= 99.9 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border-amber-500/20"}`}>
                   {item.sla_percentage}%
                 </span>
               </div>
             ))}
           </div>
           {slaList.length === 0 && (
-            <p className="text-xs text-slate-400">No verified monthly SLA observations are available yet.</p>
+            <p className="text-xs text-slate-400">No verified monthly observations are available yet.</p>
           )}
         </div>
 
@@ -575,19 +591,20 @@ export default function StatusPage() {
             <div className="flex items-center gap-2">
               <History className="w-5 h-5 text-blue-400" />
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                Historical Uptime (90 Days)
+                Historical Checks (90 UTC Days)
               </h2>
             </div>
             <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
-              {avgUptimePct}% Overall Availability
+              {avgUptimePct}% Observed Check Success
             </span>
           </div>
 
+          <p className="text-xs text-slate-400 mb-3">Daily totals use UTC. Missing days and gaps between checks are unverified; these percentages do not measure continuous uptime.</p>
           {/* 90-Day Bar Grid */}
           <div className="flex items-end gap-1 h-12 py-1 overflow-x-auto">
             {Array.from({ length: 90 }).map((_, idx) => {
               const d = new Date();
-              d.setDate(d.getDate() - (89 - idx));
+              d.setUTCDate(d.getUTCDate() - (89 - idx));
               const isoDateStr = d.toISOString().split("T")[0];
 
               const rec = history.find((h) => {
@@ -599,13 +616,13 @@ export default function StatusPage() {
                 return (
                   <div
                     key={idx}
-                    title={`${isoDateStr}: No Data (Prior to Monitoring)`}
+                    title={`${isoDateStr}: No observations recorded`}
                     className="flex-1 min-w-[6px] h-full rounded-sm bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80 transition-colors cursor-pointer"
                   />
                 );
               }
 
-              const pct = parseFloat(rec.uptime_percentage as any) || 100;
+              const pct = Number(rec.uptime_percentage);
               let barBg = "bg-emerald-500";
               if (pct < 98) barBg = "bg-rose-500";
               else if (pct < 99.5) barBg = "bg-amber-500";
@@ -613,7 +630,7 @@ export default function StatusPage() {
               return (
                 <div
                   key={idx}
-                  title={`${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`}
+                  title={`${isoDateStr}: ${pct.toFixed(2)}% Check Success (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`}
                   className={`flex-1 min-w-[6px] h-full rounded-sm ${barBg} opacity-90 hover:opacity-100 transition-opacity cursor-pointer`}
                 />
               );
@@ -624,8 +641,8 @@ export default function StatusPage() {
             <span>90 days ago</span>
             <span className="text-slate-300 font-mono">
               {history.length > 0
-                ? `${history.length} Day${history.length > 1 ? "s" : ""} Monitored (${avgUptimePct}% Avg Uptime)`
-                : "Continuous Monitoring Active"}
+                ? `${history.length} Day${history.length > 1 ? "s" : ""} with Observations (${avgUptimePct}% Check Success)`
+                : "No observations recorded"}
             </span>
             <span>Today</span>
           </div>
@@ -678,8 +695,8 @@ export default function StatusPage() {
           {incidents.length === 0 ? (
             <div className="p-8 text-center rounded-xl bg-slate-950/40 border border-slate-800/80">
               <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-80" />
-              <p className="text-sm font-medium text-slate-300">No incidents reported in the last 90 days.</p>
-              <p className="text-xs text-slate-400 mt-1">All core services and AWS infrastructure operating nominally.</p>
+              <p className="text-sm font-medium text-slate-300">No incident reports recorded in the last 90 days.</p>
+              <p className="text-xs text-slate-400 mt-1">Incident reports are separate from monitoring coverage; unobserved periods remain unknown.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -734,10 +751,10 @@ export default function StatusPage() {
         {/* Independent External Probe Footnote */}
         <div className="mt-8 p-4 rounded-xl bg-blue-950/20 border border-blue-500/20 text-xs text-blue-300 flex items-center justify-between">
           <span>
-            Independent Status Probe running on <strong>Vercel Edge Network</strong> (Isolated from AWS CloudFront/ECS).
+            Status page hosted on <strong>Vercel</strong>. Background monitoring writes independently to Neon.
           </span>
           <span className="font-mono text-[10px] text-blue-400">
-            Probe Region: {data?.region || "ap-south-2"}
+            Monitored Region: {data?.region || "ap-south-2"}
           </span>
         </div>
       </div>

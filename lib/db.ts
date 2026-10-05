@@ -16,7 +16,7 @@ export function getDb() {
     .replace(/\?channel_binding=[^&]+&?/g, "?");
 
   try {
-    return neon(connectionString);
+    return neon(connectionString, { fetchOptions: { signal: AbortSignal.timeout(15_000) } });
   } catch (err) {
     console.error("[Neon DB] Failed to initialize Neon connection:", err);
     return null;
