@@ -93,4 +93,4 @@ Schema is provisioned through reviewed `migrations/0001_status_page_schema.sql`,
 
 ## 5. Collection
 
-The secret-free cron route and supervised daemon share `executeTieredProbe` in `functions/probe-worker.ts`. The daemon executes every 60 seconds; Vercel's daily cron is a fallback. Independent scheduling requires an always-on host. A worker function URL alone is not a scheduler.
+The supervised daemon uses `executeTieredProbe` in `functions/probe-worker.ts` every 60 seconds. HTTP-triggered collection is disabled (410) and Vercel has no scheduled cron. Snapshot, daily and monthly summaries commit atomically. Independent scheduling requires an always-on host. A worker function URL alone is not a scheduler.

@@ -14,7 +14,7 @@ export function calculateMonthlySla(statuses: readonly string[]) {
   };
 }
 
-const monthlySlaRollupQuery = `
+export const monthlySlaRollupQuery = `
   WITH authoritative_service_checks AS (
     SELECT
       LEFT(COALESCE(NULLIF(service.value->>'name', ''), service.key), 100) AS service_name,

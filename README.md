@@ -20,7 +20,7 @@ Comprehensive project documentation is available under `docs/`:
 
 ## 2. Access Policy
 
-This deployment is used as an internal monitoring dashboard. Probes do not require authorization secrets. Incident and maintenance APIs are read-only; manual publication endpoints have been removed. Probe rate limiting remains enabled.
+This deployment is used as an internal monitoring dashboard. Collection runs exclusively in the supervised daemon without authorization secrets; HTTP-triggered probing is disabled. Incident and maintenance APIs are read-only; manual publication endpoints have been removed. The retired HTTP probe route returns 410 and performs no writes.
 
 ---
 
@@ -49,7 +49,7 @@ This deployment is used as an internal monitoring dashboard. Probes do not requi
 - `npm run probe:daemon` executes the shared probe writer every 60 seconds, with one request in flight, upstream timeouts, and atomic snapshot/daily-summary writes.
 - The writer refreshes monthly observed availability from real service observations. Unknown/stale states never count as healthy.
 - Run the collector on an always-on host with a supervisor. A function URL does not schedule itself. A Windows collector stops during sleep/shutdown.
-- The daily Vercel cron is a fallback only; redeploy the corrected application before relying on it.
+- HTTP-triggered probing and Vercel cron scheduling are disabled. Run the collector on an always-on host.
 - Visitors are read-only consumers. Five-second browser refreshes do not collect new observations.
 - Daily buckets use UTC; observation timestamps display in IST. Missing intervals stay unverified.
 
@@ -117,7 +117,7 @@ AWS_EC2_BASTION_INSTANCE_ID=i-0e8150bdfa767cdb6
 - `GET /api/status`: Reads latest telemetry snapshot from Neon DB (`source: "neon_db_snapshot"`).
 - `GET /api/history`: Returns 90-day daily availability history for uptime calendar visualization.
 - `GET /api/incidents`: Fetches active incidents & timeline updates from Neon DB.
-- `GET /api/cron/probe`: Daily Vercel cron health probe fallback endpoint.
+- `GET /api/cron/probe`: Retired endpoint; returns HTTP 410 without upstream requests or database writes.
 
 ---
 

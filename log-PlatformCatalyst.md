@@ -41,3 +41,12 @@ Files modified: .env.example, README.md, docs/TRD.md, app/api/cron/probe/route.t
 Verification: 11 applicable tests pass; ESLint and TypeScript pass; local cron accepts a request without authorization and commits real telemetry; manual POST routes return 405 while history GETs remain available. Production deployment is unchanged.
 
 Timestamp of Log Update: 5 October 2026 at 5:29 pm (IST)
+## 3) [2026-09-30 11:51:13 +05:30] Correct Quality Secret-Scan Event Range
+
+Scope & Implementation: Removed explicit `base` and `head` inputs from the pinned TruffleHog action after GitHub Actions evidence showed that both resolved to the same checkout on push events. The action now derives the correct event commit range itself.
+
+Files modified: `.github/workflows/quality.yml` and this log.
+
+Verification: GitHub Actions run `36677620580` established the root cause: TruffleHog rejected the equal base/head commits before scanning. The corrected workflow will be verified by the pull-request Quality run.
+
+Timestamp of Log Update: 30 September 2026 at 11:51 AM (IST)

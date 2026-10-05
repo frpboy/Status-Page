@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { refreshCurrentMonthSla } from "@/lib/sla-aggregation";
+import { monthlySlaRollupQuery } from "@/lib/sla-aggregation";
 import { getServiceStatus } from "@/lib/status-truth";
 
 /**
@@ -177,11 +177,11 @@ export async function executeTieredProbe() {
          updated_at = NOW()`,
       [timestamp.split("T")[0], healthyCheck ? 1 : 0, latencyMs]
       ),
+      // ponytail: monthly scan once per cycle; incremental rollups if volume becomes costly.
+      sql.query(monthlySlaRollupQuery),
     ]);
 
     neonDbWriteVerified = true;
-    // ponytail: monthly scan once per cycle; incremental rollups if volume becomes costly.
-    await refreshCurrentMonthSla();
     slaUpdated = true;
   } catch (err: any) {
     dbErrorMsg = err?.message || "Neon DB write failed";
@@ -209,22 +209,3 @@ export async function executeTieredProbe() {
     services,
   };
 }
-
-const probeWorker = {
-  async fetch(request: Request) {
-    try {
-      const result = await executeTieredProbe();
-      return new Response(JSON.stringify(result), {
-        status: result.success ? 200 : 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (err: any) {
-      return new Response(
-        JSON.stringify({ error: err?.message || "Neon function execution error" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-  },
-};
-
-export default probeWorker;
