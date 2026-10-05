@@ -1,5 +1,11 @@
 # Status-page reliability audit — October 5, 2026
 
+## Superseding configuration and verification
+
+The sections below record the initial audit and checks before the final internal-monitoring changes. Their authorization, POST-route and publication statements are historical. `STATUS_ADMIN_KEY` and `CRON_SECRET` are no longer required. Incident and maintenance POST handlers were removed (405); HTTP-triggered probing is retired (410), makes no upstream requests or database writes, and Vercel cron is disabled. Only the supervised daemon collects data. Snapshot, daily and monthly summaries now commit atomically. The obsolete write limiter is not a protection for any active write route.
+
+PR #1 changes were consolidated into PR #2 and pushed. Twelve tests, lint, TypeScript, production build and hosted Quality passed; GitGuardian's mocked fixture occurrence was classified as a test credential, and its check passes. Auto-merge is enabled, pending the required independent approval. Production application deployment is still unverified. The local daemon still requires this computer to stay awake.
+
 ## Result
 
 Collection has been restored against the existing Neon database. The corrected local dashboard is running at http://localhost:3002/. The existing production deployment also reads the fresh records, but the application changes in this checkout have not been published to production.

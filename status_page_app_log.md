@@ -52,3 +52,12 @@ Timestamp of Log Update: 30 September 2026 at 12:19:58 pm (IST)
 - Verification: lint, typecheck and production build passed; 11 original tests passed, additional retired-route boundary test run separately. Live probe committed at 2026-10-05T12:27:11.150Z; supervised daemon restarted. No schema changes.
 
 Timestamp of Log Update: 05 October 2026 at 05:57:49 pm (IST)
+
+## 3) Supersede historical audit statements
+
+- Frontend Files: None.
+- Backend Files: None.
+- Documentation: docs/2026-10-05-RELIABILITY-AUDIT.md now explicitly marks old secret authorization and incident POST claims as historical and records daemon-only collection and current verification.
+- Verification: 12 tests passed; hosted Quality and external checks passed on 9085c02. PR 1 consolidated and closed; PR 2 auto-merge waits for independent approval. Documentation-only correction checked with git diff --check.
+
+Timestamp of Log Update: 5 October 2026 at 6:02:56 pm (IST)
