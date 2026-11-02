@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -218,9 +218,25 @@ export default function StatusPage() {
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  // Bolt Optimization ⚡: Memoize historical lookup map and average percentage calculation.
+  // Instead of scanning the entire history array on every 90-day bar iteration (O(90 * N))
+  // and re-reducing on every 5s polling cycle, we index by ISO date string in O(N) once
+  // when `history` changes and achieve O(1) bar lookups.
+  const historyByDate = useMemo(() => {
+    const map = new Map<string, UptimeHistoryRecord>();
+    for (const h of history) {
+      if (typeof h.date === "string") {
+        map.set(h.date.split("T")[0], h);
+      }
+    }
+    return map;
+  }, [history]);
+
+  const avgUptimePct = useMemo(() => {
+    if (history.length === 0) return "—";
+    const sum = history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0);
+    return (sum / history.length).toFixed(2);
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -590,10 +606,7 @@ export default function StatusPage() {
               d.setDate(d.getDate() - (89 - idx));
               const isoDateStr = d.toISOString().split("T")[0];
 
-              const rec = history.find((h) => {
-                const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
-                return hDate === isoDateStr;
-              });
+              const rec = historyByDate.get(isoDateStr);
 
               if (!rec) {
                 return (
