@@ -49,3 +49,21 @@ test("rate limiter rejects requests after its fixed window limit", () => {
   assert.equal(limiter.check("operator", 1).allowed, true);
   assert.equal(limiter.check("operator", 2).allowed, false);
 });
+
+test("next.config.js configures standard security headers", async () => {
+  const nextConfig = require("../next.config.js");
+  assert.equal(typeof nextConfig.headers, "function", "headers function must be defined");
+
+  const headerConfigs = await nextConfig.headers();
+  const rootConfig = headerConfigs.find((c: { source: string }) => c.source === "/(.*)");
+  assert.ok(rootConfig, "Root path security headers config should exist");
+
+  const headersMap = new Map<string, string>(
+    rootConfig.headers.map((h: { key: string; value: string }) => [h.key.toLowerCase(), h.value])
+  );
+
+  assert.equal(headersMap.get("x-frame-options"), "DENY");
+  assert.equal(headersMap.get("x-content-type-options"), "nosniff");
+  assert.equal(headersMap.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.equal(headersMap.get("permissions-policy"), "camera=(), microphone=(), geolocation=()");
+});
