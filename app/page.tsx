@@ -165,7 +165,7 @@ export default function StatusPage() {
     if (loading && !data) {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-          <span className="w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
+          <span aria-hidden="true" className="w-2 h-2 rounded-full bg-slate-400 animate-pulse motion-reduce:animate-none" />
           Checking...
         </span>
       );
@@ -174,7 +174,7 @@ export default function StatusPage() {
     if (s === "operational" || s === "healthy" || s === "ok") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span aria-hidden="true" className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse motion-reduce:animate-none" />
           Operational
         </span>
       );
@@ -182,7 +182,7 @@ export default function StatusPage() {
     if (s === "degraded" || s === "warning") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          <span aria-hidden="true" className="w-2 h-2 rounded-full bg-amber-400" />
           Degraded Performance
         </span>
       );
@@ -190,7 +190,7 @@ export default function StatusPage() {
     if (s === "stale") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-          <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" />
+          <span aria-hidden="true" className="w-2 h-2 rounded-full bg-amber-300 animate-pulse motion-reduce:animate-none" />
           Stale Telemetry (&gt;5m)
         </span>
       );
@@ -198,14 +198,14 @@ export default function StatusPage() {
     if (s === "unknown" || s === "unverified") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
-          <span className="w-2 h-2 rounded-full bg-slate-400" />
+          <span aria-hidden="true" className="w-2 h-2 rounded-full bg-slate-400" />
           Unknown / Unverified
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-        <span className="w-2 h-2 rounded-full bg-rose-400" />
+        <span aria-hidden="true" className="w-2 h-2 rounded-full bg-rose-400" />
         Service Outage
       </span>
     );
@@ -232,7 +232,7 @@ export default function StatusPage() {
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/5">
-              <Activity className="w-6 h-6 animate-pulse" />
+              <Activity aria-hidden="true" className="w-6 h-6 animate-pulse motion-reduce:animate-none" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -248,10 +248,12 @@ export default function StatusPage() {
           <div className="flex items-center gap-3 self-end sm:self-auto">
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              aria-pressed={autoRefresh}
+              aria-label={`Toggle 5-second auto-refresh, currently ${autoRefresh ? "enabled" : "disabled"}`}
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                 autoRefresh
-                  ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                  : "bg-slate-800 text-slate-400 border-slate-700"
+                  ? "bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700/60"
               }`}
             >
               Auto-refresh: {autoRefresh ? "5s" : "Off"}
@@ -260,9 +262,11 @@ export default function StatusPage() {
             <button
               onClick={fetchOverview}
               disabled={loading}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 shadow-md shadow-blue-600/20"
+              aria-busy={loading}
+              aria-label="Refresh status overview now"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 shadow-md shadow-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 motion-reduce:animate-none ${loading ? "animate-spin" : ""}`} />
               Refresh Now
             </button>
 
@@ -270,10 +274,11 @@ export default function StatusPage() {
               href="https://erp.zerpai.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+              aria-label="Zerpai App Portal (opens in a new tab)"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               App Portal
-              <ExternalLink className="w-3 h-3 text-slate-400" />
+              <ExternalLink aria-hidden="true" className="w-3 h-3 text-slate-400" />
             </a>
           </div>
         </header>
@@ -299,7 +304,7 @@ export default function StatusPage() {
         )}
 
         {/* Overall Status Banner */}
-        <div className="mt-6">
+        <div className="mt-6" role="status" aria-live="polite">
           {overallStatus === "operational" && (
             <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between shadow-xl">
               <div className="flex items-center gap-4">
