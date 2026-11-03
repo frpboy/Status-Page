@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -218,9 +218,52 @@ export default function StatusPage() {
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  // Bolt Optimization: Memoize overall 90-day average uptime percentage so it only
+  // recalculates when history updates, avoiding redundant array reductions on 5s poll ticks.
+  const avgUptimePct = useMemo(() => {
+    if (history.length === 0) return "—";
+    const sum = history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0);
+    return (sum / history.length).toFixed(2);
+  }, [history]);
+
+  // Bolt Optimization: Precompute 90-day history bars using an O(N) Map lookup.
+  // Avoids nested O(90 * N) Array.find() iterations and 90 Date allocations on every 5s live status poll tick.
+  const uptimeBars = useMemo(() => {
+    const historyMap = new Map<string, UptimeHistoryRecord>();
+    for (const item of history) {
+      const dateKey = typeof item.date === "string" ? item.date.split("T")[0] : "";
+      if (dateKey) historyMap.set(dateKey, item);
+    }
+
+    const today = new Date();
+    return Array.from({ length: 90 }, (_, idx) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (89 - idx));
+      const isoDateStr = d.toISOString().split("T")[0];
+      const rec = historyMap.get(isoDateStr);
+
+      if (!rec) {
+        return {
+          key: idx,
+          isMissing: true,
+          title: `${isoDateStr}: No Data (Prior to Monitoring)`,
+          barBg: "",
+        };
+      }
+
+      const pct = parseFloat(rec.uptime_percentage as any) || 100;
+      let barBg = "bg-emerald-500";
+      if (pct < 98) barBg = "bg-rose-500";
+      else if (pct < 99.5) barBg = "bg-amber-500";
+
+      return {
+        key: idx,
+        isMissing: false,
+        title: `${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`,
+        barBg,
+      };
+    });
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -585,39 +628,21 @@ export default function StatusPage() {
 
           {/* 90-Day Bar Grid */}
           <div className="flex items-end gap-1 h-12 py-1 overflow-x-auto">
-            {Array.from({ length: 90 }).map((_, idx) => {
-              const d = new Date();
-              d.setDate(d.getDate() - (89 - idx));
-              const isoDateStr = d.toISOString().split("T")[0];
-
-              const rec = history.find((h) => {
-                const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
-                return hDate === isoDateStr;
-              });
-
-              if (!rec) {
-                return (
-                  <div
-                    key={idx}
-                    title={`${isoDateStr}: No Data (Prior to Monitoring)`}
-                    className="flex-1 min-w-[6px] h-full rounded-sm bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80 transition-colors cursor-pointer"
-                  />
-                );
-              }
-
-              const pct = parseFloat(rec.uptime_percentage as any) || 100;
-              let barBg = "bg-emerald-500";
-              if (pct < 98) barBg = "bg-rose-500";
-              else if (pct < 99.5) barBg = "bg-amber-500";
-
-              return (
+            {uptimeBars.map((bar) =>
+              bar.isMissing ? (
                 <div
-                  key={idx}
-                  title={`${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`}
-                  className={`flex-1 min-w-[6px] h-full rounded-sm ${barBg} opacity-90 hover:opacity-100 transition-opacity cursor-pointer`}
+                  key={bar.key}
+                  title={bar.title}
+                  className="flex-1 min-w-[6px] h-full rounded-sm bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80 transition-colors cursor-pointer"
                 />
-              );
-            })}
+              ) : (
+                <div
+                  key={bar.key}
+                  title={bar.title}
+                  className={`flex-1 min-w-[6px] h-full rounded-sm ${bar.barBg} opacity-90 hover:opacity-100 transition-opacity cursor-pointer`}
+                />
+              )
+            )}
           </div>
 
           <div className="flex items-center justify-between text-xs text-slate-400 mt-3 pt-3 border-t border-slate-800">
