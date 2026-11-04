@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -218,9 +218,27 @@ export default function StatusPage() {
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  // ⚡ Bolt Optimization: Memoize 90-day history indexing and average uptime calculation.
+  // Prevents O(90 * N) searches through history and redundant O(N) array reductions
+  // on every 5s polling cycle when only live status `data` is updated.
+  const historyByDate = useMemo(() => {
+    const map = new Map<string, UptimeHistoryRecord>();
+    for (const rec of history) {
+      const hDate = typeof rec.date === "string" ? rec.date.split("T")[0] : "";
+      if (hDate && !map.has(hDate)) {
+        map.set(hDate, rec);
+      }
+    }
+    return map;
+  }, [history]);
+
+  const avgUptimePct = useMemo(() => {
+    if (history.length === 0) return "—";
+    return (
+      history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) /
+      history.length
+    ).toFixed(2);
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -590,10 +608,8 @@ export default function StatusPage() {
               d.setDate(d.getDate() - (89 - idx));
               const isoDateStr = d.toISOString().split("T")[0];
 
-              const rec = history.find((h) => {
-                const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
-                return hDate === isoDateStr;
-              });
+              // O(1) hash map lookup replacing previous O(N) history.find() in the 90-day grid loop
+              const rec = historyByDate.get(isoDateStr);
 
               if (!rec) {
                 return (
