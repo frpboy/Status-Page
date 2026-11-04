@@ -53,8 +53,9 @@ test("rate limiter rejects requests after its fixed window limit", () => {
 test("next.config.js configures standard HTTP security headers", async () => {
   const nextConfigModule = await import("../next.config.js");
   const nextConfig = nextConfigModule.default || nextConfigModule;
-  assert.equal(typeof nextConfig.headers, "function");
-  const headersConfig = await nextConfig.headers();
+  assert.ok(typeof nextConfig.headers === "function", "nextConfig.headers should be a function");
+  const getHeaders = nextConfig.headers;
+  const headersConfig = await getHeaders();
   const globalHeaderRule = headersConfig.find(
     (rule: { source: string; headers: Array<{ key: string; value: string }> }) => rule.source === "/:path*"
   );
