@@ -247,33 +247,39 @@ export default function StatusPage() {
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
             <button
+              type="button"
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              aria-label={`Toggle auto-refresh, currently ${autoRefresh ? "enabled every 5 seconds" : "disabled"}`}
+              aria-pressed={autoRefresh}
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                 autoRefresh
                   ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                  : "bg-slate-800 text-slate-400 border-slate-700"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600"
               }`}
             >
               Auto-refresh: {autoRefresh ? "5s" : "Off"}
             </button>
 
             <button
+              type="button"
               onClick={fetchOverview}
               disabled={loading}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 shadow-md shadow-blue-600/20"
+              aria-label="Refresh status overview now"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              Refresh Now
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+              <span>{loading ? "Refreshing..." : "Refresh Now"}</span>
             </button>
 
             <a
               href="https://erp.zerpai.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+              aria-label="Zerpai App Portal (opens in a new tab)"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               App Portal
-              <ExternalLink className="w-3 h-3 text-slate-400" />
+              <ExternalLink className="w-3 h-3 text-slate-400" aria-hidden="true" />
             </a>
           </div>
         </header>
@@ -299,11 +305,11 @@ export default function StatusPage() {
         )}
 
         {/* Overall Status Banner */}
-        <div className="mt-6">
+        <div className="mt-6" role="status" aria-live="polite">
           {overallStatus === "operational" && (
             <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between shadow-xl">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30" aria-hidden="true">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
                 <div>
