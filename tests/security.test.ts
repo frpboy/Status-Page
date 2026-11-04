@@ -49,3 +49,19 @@ test("rate limiter rejects requests after its fixed window limit", () => {
   assert.equal(limiter.check("operator", 1).allowed, true);
   assert.equal(limiter.check("operator", 2).allowed, false);
 });
+
+test("next.config.js configures standard HTTP security headers", async () => {
+  const nextConfig = require("../next.config.js");
+  assert.equal(typeof nextConfig.headers, "function");
+  const headersConfig = await nextConfig.headers();
+  const globalHeaderRule = headersConfig.find((rule: any) => rule.source === "/:path*");
+  assert.ok(globalHeaderRule, "Should have a global header rule for /:path*");
+
+  const headerMap = new Map(
+    globalHeaderRule.headers.map((h: { key: string; value: string }) => [h.key.toLowerCase(), h.value])
+  );
+  assert.equal(headerMap.get("x-content-type-options"), "nosniff");
+  assert.equal(headerMap.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(headerMap.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.ok(headerMap.has("permissions-policy"));
+});
