@@ -1,0 +1,5 @@
+# Palette's UX Journal
+
+## 2026-09-30 - Interactive Calendar Visualization & Toggle Accessibility
+**Learning:** Dense data visualization bar grids (e.g., 90-day uptime bars) often rely purely on mouse hover tooltips (`title` attribute) and `cursor-pointer`, which leaves keyboard and screen reader users unable to discover or inspect daily telemetry. Giving visual bar elements semantic roles (`role="img"`), keyboard focusability (`tabIndex={0}`), mirrored `aria-label` descriptions, and high-contrast `focus-visible:ring-2` indicators makes complex historical status timelines fully accessible without disturbing the dense compact layout. Additionally, action buttons that toggle states (like auto-refresh) must explicitly declare `aria-pressed` and dynamic descriptive labels to communicate both state and action intent to assistive technologies.
+**Action:** When creating compact micro-charts or daily uptime bars, always pair `title` with matching `aria-label`, `role="img"`, `tabIndex={0}`, and `focus-visible:ring-2` focus styling. Pair toggle buttons with `aria-pressed`.
