@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -218,9 +218,23 @@ export default function StatusPage() {
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  // Bolt Optimization: Memoize O(1) date index map and average uptime reduction
+  // Prevents repeated O(N * 90) searches and O(N) reductions on every 5s polling cycle
+  const { historyByDate, avgUptimePct } = useMemo(() => {
+    const map = new Map<string, UptimeHistoryRecord>();
+    let totalUptime = 0;
+
+    for (const h of history) {
+      const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
+      if (hDate) {
+        map.set(hDate, h);
+      }
+      totalUptime += parseFloat(h.uptime_percentage as any) || 0;
+    }
+
+    const avg = history.length > 0 ? (totalUptime / history.length).toFixed(2) : "—";
+    return { historyByDate: map, avgUptimePct: avg };
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -590,10 +604,8 @@ export default function StatusPage() {
               d.setDate(d.getDate() - (89 - idx));
               const isoDateStr = d.toISOString().split("T")[0];
 
-              const rec = history.find((h) => {
-                const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
-                return hDate === isoDateStr;
-              });
+              // Bolt Optimization: O(1) map lookup replaces O(N) array search inside 90-day loop
+              const rec = historyByDate.get(isoDateStr);
 
               if (!rec) {
                 return (
