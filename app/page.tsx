@@ -248,7 +248,10 @@ export default function StatusPage() {
           <div className="flex items-center gap-3 self-end sm:self-auto">
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              role="switch"
+              aria-checked={autoRefresh}
+              aria-label="Toggle auto-refresh every 5 seconds"
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none ${
                 autoRefresh
                   ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
                   : "bg-slate-800 text-slate-400 border-slate-700"
@@ -260,7 +263,8 @@ export default function StatusPage() {
             <button
               onClick={fetchOverview}
               disabled={loading}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 shadow-md shadow-blue-600/20"
+              aria-busy={loading}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none shadow-md shadow-blue-600/20"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh Now
@@ -270,7 +274,7 @@ export default function StatusPage() {
               href="https://erp.zerpai.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
             >
               App Portal
               <ExternalLink className="w-3 h-3 text-slate-400" />
@@ -596,11 +600,15 @@ export default function StatusPage() {
               });
 
               if (!rec) {
+                const noDataLabel = `${isoDateStr}: No Data (Prior to Monitoring)`;
                 return (
                   <div
                     key={idx}
-                    title={`${isoDateStr}: No Data (Prior to Monitoring)`}
-                    className="flex-1 min-w-[6px] h-full rounded-sm bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80 transition-colors cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={noDataLabel}
+                    title={noDataLabel}
+                    className="flex-1 min-w-[6px] h-full rounded-sm bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none focus-visible:z-20 transition-all cursor-pointer"
                   />
                 );
               }
@@ -610,11 +618,15 @@ export default function StatusPage() {
               if (pct < 98) barBg = "bg-rose-500";
               else if (pct < 99.5) barBg = "bg-amber-500";
 
+              const uptimeLabel = `${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`;
               return (
                 <div
                   key={idx}
-                  title={`${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`}
-                  className={`flex-1 min-w-[6px] h-full rounded-sm ${barBg} opacity-90 hover:opacity-100 transition-opacity cursor-pointer`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={uptimeLabel}
+                  title={uptimeLabel}
+                  className={`flex-1 min-w-[6px] h-full rounded-sm ${barBg} opacity-90 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none focus-visible:z-20 transition-all cursor-pointer`}
                 />
               );
             })}
