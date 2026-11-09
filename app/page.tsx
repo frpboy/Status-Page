@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -218,9 +218,27 @@ export default function StatusPage() {
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  // Bolt Optimization: Memoize average uptime calculation to avoid recalculating on 5s polling renders
+  const avgUptimePct = useMemo(() => {
+    return history.length > 0
+      ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
+      : "—";
+  }, [history]);
+
+  // Bolt Optimization: Pre-index history by ISO date ('YYYY-MM-DD') into a Map.
+  // This turns 90 consecutive nested array scans (up to 8,100 string splits/comparisons per render)
+  // into 90 O(1) hash map lookups, drastically reducing render execution overhead during polling.
+  const historyMap = useMemo(() => {
+    const map = new Map<string, UptimeHistoryRecord>();
+    for (const h of history) {
+      const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
+      // Preserve first occurrence semantics identical to Array.prototype.find
+      if (hDate && !map.has(hDate)) {
+        map.set(hDate, h);
+      }
+    }
+    return map;
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -590,10 +608,7 @@ export default function StatusPage() {
               d.setDate(d.getDate() - (89 - idx));
               const isoDateStr = d.toISOString().split("T")[0];
 
-              const rec = history.find((h) => {
-                const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
-                return hDate === isoDateStr;
-              });
+              const rec = historyMap.get(isoDateStr);
 
               if (!rec) {
                 return (
