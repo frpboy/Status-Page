@@ -49,3 +49,43 @@ test("rate limiter rejects requests after its fixed window limit", () => {
   assert.equal(limiter.check("operator", 1).allowed, true);
   assert.equal(limiter.check("operator", 2).allowed, false);
 });
+
+test("security headers are configured and synchronized across Next.js and Vercel", async () => {
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const { pathToFileURL } = await import("node:url");
+
+  const nextConfigModule = await import(
+    pathToFileURL(path.resolve(process.cwd(), "next.config.js")).href
+  );
+  const nextConfig = nextConfigModule.default || nextConfigModule;
+  assert.equal(typeof nextConfig.headers, "function");
+
+  const nextHeaders = await nextConfig.headers();
+  const globalNextHeaderGroup = nextHeaders.find((h: any) => h.source === "/(.*)");
+  assert.ok(globalNextHeaderGroup, "next.config.js should have a /(.*) headers rule");
+
+  const vercelConfig = JSON.parse(
+    await fs.readFile(path.resolve(process.cwd(), "vercel.json"), "utf-8")
+  );
+  const globalVercelHeaderGroup = vercelConfig.headers.find(
+    (h: any) => h.source === "/(.*)"
+  );
+  assert.ok(globalVercelHeaderGroup, "vercel.json should have a /(.*) headers rule");
+
+  const expectedHeaders: Record<string, string> = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  };
+
+  for (const [key, value] of Object.entries(expectedHeaders)) {
+    const nextItem = globalNextHeaderGroup.headers.find((h: any) => h.key === key);
+    assert.equal(nextItem?.value, value, `next.config.js missing header ${key}`);
+
+    const vercelItem = globalVercelHeaderGroup.headers.find((h: any) => h.key === key);
+    assert.equal(vercelItem?.value, value, `vercel.json missing header ${key}`);
+  }
+});
