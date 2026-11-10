@@ -246,9 +246,15 @@ export default function StatusPage() {
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-auto">
+            <span className="sr-only" aria-live="polite" aria-atomic="true">
+              {loading ? "Refreshing telemetry status..." : `Telemetry updated. Overall status: ${overallStatus}.`}
+            </span>
             <button
+              type="button"
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+              aria-pressed={autoRefresh}
+              aria-label={`Toggle auto-refresh, currently ${autoRefresh ? "enabled every 5 seconds" : "disabled"}`}
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                 autoRefresh
                   ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
                   : "bg-slate-800 text-slate-400 border-slate-700"
@@ -258,22 +264,25 @@ export default function StatusPage() {
             </button>
 
             <button
+              type="button"
               onClick={fetchOverview}
               disabled={loading}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 shadow-md shadow-blue-600/20"
+              aria-busy={loading}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50 shadow-md shadow-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              Refresh Now
+              <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span>{loading ? "Refreshing..." : "Refresh Now"}</span>
             </button>
 
             <a
               href="https://erp.zerpai.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+              aria-label="App Portal (opens in a new tab)"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             >
               App Portal
-              <ExternalLink className="w-3 h-3 text-slate-400" />
+              <ExternalLink aria-hidden="true" className="w-3 h-3 text-slate-400" />
             </a>
           </div>
         </header>
