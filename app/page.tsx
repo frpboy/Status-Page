@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -218,9 +218,52 @@ export default function StatusPage() {
   const bastionDetails = data?.services?.ec2_bastion?.details || {};
   const cognitoDetails = data?.services?.cognito?.details || {};
 
-  const avgUptimePct = history.length > 0
-    ? (history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0) / history.length).toFixed(2)
-    : "—";
+  // Performance optimization: Memoize average uptime calculation to avoid re-summing on 5s polling re-renders
+  const avgUptimePct = useMemo(() => {
+    if (history.length === 0) return "—";
+    const sum = history.reduce((acc, curr) => acc + (parseFloat(curr.uptime_percentage as any) || 0), 0);
+    return (sum / history.length).toFixed(2);
+  }, [history]);
+
+  // Performance optimization: Index history by ISO date in a Map and precompute the 90-day bars.
+  // This reduces rendering work from O(90 * history.length) repeated array searches and 90 Date allocations
+  // on every 5s polling tick to an O(history.length) Map lookup built only when history actually changes.
+  const uptimeBars = useMemo(() => {
+    const historyMap = new Map<string, UptimeHistoryRecord>();
+    for (const rec of history) {
+      const hDate = typeof rec.date === "string" ? rec.date.split("T")[0] : "";
+      if (hDate) historyMap.set(hDate, rec);
+    }
+
+    const today = new Date();
+    return Array.from({ length: 90 }, (_, idx) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (89 - idx));
+      const isoDateStr = d.toISOString().split("T")[0];
+      const rec = historyMap.get(isoDateStr);
+
+      if (!rec) {
+        return {
+          isoDateStr,
+          hasData: false,
+          title: `${isoDateStr}: No Data (Prior to Monitoring)`,
+          barBg: "bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80",
+        };
+      }
+
+      const pct = parseFloat(rec.uptime_percentage as any) || 100;
+      let barBg = "bg-emerald-500 opacity-90 hover:opacity-100";
+      if (pct < 98) barBg = "bg-rose-500 opacity-90 hover:opacity-100";
+      else if (pct < 99.5) barBg = "bg-amber-500 opacity-90 hover:opacity-100";
+
+      return {
+        isoDateStr,
+        hasData: true,
+        title: `${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`,
+        barBg,
+      };
+    });
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white pb-16">
@@ -585,39 +628,13 @@ export default function StatusPage() {
 
           {/* 90-Day Bar Grid */}
           <div className="flex items-end gap-1 h-12 py-1 overflow-x-auto">
-            {Array.from({ length: 90 }).map((_, idx) => {
-              const d = new Date();
-              d.setDate(d.getDate() - (89 - idx));
-              const isoDateStr = d.toISOString().split("T")[0];
-
-              const rec = history.find((h) => {
-                const hDate = typeof h.date === "string" ? h.date.split("T")[0] : "";
-                return hDate === isoDateStr;
-              });
-
-              if (!rec) {
-                return (
-                  <div
-                    key={idx}
-                    title={`${isoDateStr}: No Data (Prior to Monitoring)`}
-                    className="flex-1 min-w-[6px] h-full rounded-sm bg-slate-800/50 border border-slate-800/80 hover:bg-slate-700/80 transition-colors cursor-pointer"
-                  />
-                );
-              }
-
-              const pct = parseFloat(rec.uptime_percentage as any) || 100;
-              let barBg = "bg-emerald-500";
-              if (pct < 98) barBg = "bg-rose-500";
-              else if (pct < 99.5) barBg = "bg-amber-500";
-
-              return (
-                <div
-                  key={idx}
-                  title={`${isoDateStr}: ${pct.toFixed(2)}% Uptime (${rec.successful_pings || 0}/${rec.total_pings || 0} pings)`}
-                  className={`flex-1 min-w-[6px] h-full rounded-sm ${barBg} opacity-90 hover:opacity-100 transition-opacity cursor-pointer`}
-                />
-              );
-            })}
+            {uptimeBars.map((bar, idx) => (
+              <div
+                key={idx}
+                title={bar.title}
+                className={`flex-1 min-w-[6px] h-full rounded-sm ${bar.barBg} transition-colors cursor-pointer`}
+              />
+            ))}
           </div>
 
           <div className="flex items-center justify-between text-xs text-slate-400 mt-3 pt-3 border-t border-slate-800">
